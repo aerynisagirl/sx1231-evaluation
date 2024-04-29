@@ -1,0 +1,6 @@
+# MPLabX related ignores
+.generated_files/*
+queuelogs/*
+build/*
+defmplabxtrace.log
+defmplabxtrace.log.inx

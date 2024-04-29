@@ -1,0 +1,5 @@
+# Only keep the required configuration files
+*
+!.gitignore
+!configurations.xml
+!project.xml
