@@ -16,7 +16,14 @@
 
 
 //Define prototypes for functions used in the SX1231 source file
-//    TODO: uhhhhh add some functions that actually mean something??
+extern void initializeTransceiver();  //Initialize Transceiver Function, configures the transceiver IC to operate as required for the application
+
+extern void setCarrierFreq(uint32_t freqRF);  //Set Carrier Frequency Function, sets the RF transceiver to tune to the desired carrier frequency
+
+extern void interactWithRegisters(uint8_t startAddress,   //Interact With Registers Functions, reads/writes to the registers in the transceiver at the given start address using/into dataBytes
+                                  uint8_t *dataBytes,
+                                  uint32_t bufferLength,
+                                  uint8_t readMode);
 
 
 #endif

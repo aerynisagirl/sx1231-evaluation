@@ -30,7 +30,7 @@
 #pragma config IESO = ON               //Internal/External Switch Over (Enabled)
 #pragma config POSCMOD = OFF           //Primary Oscillator Configuration (Primary osc disabled)
 #pragma config OSCIOFNC = OFF          //CLKO Output Signal Active on the OSCO Pin (Disabled)
-#pragma config FPBDIV = DIV_4          //Peripheral Clock Divisor (Pb_Clk is Sys_Clk/4)
+#pragma config FPBDIV = DIV_2          //Peripheral Clock Divisor (Pb_Clk is Sys_Clk/2)
 #pragma config FCKSM = CSDCMD          //Clock Switching and Monitor Selection (Clock Switch Disable, FSCM Disabled)
 #pragma config WDTPS = PS1048576       //Watchdog Timer Postscaler (1:1048576)
 #pragma config WINDIS = OFF            //Watchdog Timer Window Enable (Watchdog Timer is in Non-Window Mode)
@@ -52,7 +52,8 @@
 
 
 //Import any libraries used by this file
-#include <xc.h>  //Include the primary header used by the XC32 compiler
+#include <xc.h>               //Include the primary header used by the XC32 compiler
+#include "SX1231Interface.h"  //Include the SX1231 driver header to interface with the SX1231 transceiver IC
 
 
 //Define any variables that are external to this file
