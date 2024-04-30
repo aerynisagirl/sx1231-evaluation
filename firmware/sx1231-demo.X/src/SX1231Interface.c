@@ -64,6 +64,7 @@ void setCarrierFreq(uint32_t freqRF)
 //Interact With Registers Functions, reads/writes to the registers in the transceiver at the given start address using/into dataBytes 
 void interactWithRegisters(uint8_t startAddress, uint8_t *dataBytes, uint32_t bufferLength, uint8_t readMode)
 {
+    uint8_t test = 0x00;
     while (SPI2CON & 0x00000800);  //Wait until the SPI2 peripheral is in idle mode before starting the data transaction
 
     startAddress |= 0x80;                //Force-set Bit-7 of the startAddress variable to indicate the assumed write operation
@@ -73,6 +74,8 @@ void interactWithRegisters(uint8_t startAddress, uint8_t *dataBytes, uint32_t bu
     SPI2BUF = startAddress;  //Begin the transaction by writing the contents of the startAddress variable to the data buffer of SPI2
 
     while (SPI2STAT & 0x00000800);  //Wait until the SPI2 peripheral is no longer busy before continuing
+    SPI2BUF;                        //Read from the SPI2 peripherals input buffer to clear it
+    SPI2STATCLR = 0x00000040;       //Clear the Read Buffer Overflow flag in the SPI2 status register
     
     //Perform the data exchange for the size of the provided buffer
     while (bufferLength--)
@@ -92,7 +95,6 @@ void interactWithRegisters(uint8_t startAddress, uint8_t *dataBytes, uint32_t bu
         //Collect the obtained data byte when in read mode from the SPI2 peripheral, ignoring the first byte in the sequence
         if (readMode)
         {
-            while (SPI2STAT & 0x00000001);            //Wait until the receive buffer in the SPI2 peripheral is empty before reading data from it
             *(dataBytes++) = (SPI2BUF & 0x000000FF);  //Write the contents of the SPI2 receive buffer into the address specified by the dataBytes pointer
         }
         else
