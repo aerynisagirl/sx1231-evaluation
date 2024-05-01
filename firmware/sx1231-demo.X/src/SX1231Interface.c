@@ -16,12 +16,29 @@
 //Initialize Transceiver Function, configures the transceiver IC to operate as required for the application
 void initializeTransceiver()
 {
-//    const uint8_t carrierFrequency[] = {};
-//    interactWithRegisters(0x01, &configurationBytes, 0x00000000, 0x00000000);  //Send the desired default configuration to the transceiver
+    uint8_t configBytes[0x00000010] = {0x04, 0x09, 0x19, 0x00, 0x00, 0x52, 0x6C, 0x40, 0x00};
+    interactWithRegisters(REGADDR_OPMODE, configBytes, 0x09, 0x00);
+
+    configBytes[0x00] = 0x5F;
+    configBytes[0x01] = 0x09;
+    configBytes[0x02] = 0x0F;
+    interactWithRegisters(REGADDR_PALEVEL, configBytes, 0x03, 0x00);
+
+    configBytes[0x00] = 0x00;
+    configBytes[0x01] = 0x0F;
+    configBytes[0x02] = 0x18;
+    interactWithRegisters(REGADDR_PREAMBLE_MSB, configBytes, 0x03, 0x00);
+
+    configBytes[0x00] = 0x80;
+    configBytes[0x01] = 0x40;
+    configBytes[0x02] = 0x00;
+    configBytes[0x03] = 0x00;
+    configBytes[0x04] = 0x00;
+    configBytes[0x05] = 0x8F;
+    interactWithRegisters(REGADDR_PACKETCONFIG1, configBytes, 0x06, 0x00);
+
+    setCarrierFreq(431500000);
 }
-
-
-
 
 
 
@@ -33,26 +50,28 @@ void initializeTransceiver()
 //Set Carrier Frequency Function, sets the RF transceiver to tune to the desired carrier frequency
 void setCarrierFreq(uint32_t freqRF)
 {
-    const double freqStep = 32000000 / 2 ^ 19;            //Calculate the F_step constant, the resolution of the carrier PLL in the transceiver IC
-    uint32_t registerValue = (double) freqRF / freqStep;  //Determine the value to write to the RegFrf register in the transceiver IC to obtain the desired carrier frequency
+    double calculatedFrequency = freqRF / SX1231_F_STEP;  //Calculate the value of Frf to provide the transceiver IC to achieve the desired carrier frequency
+    uint32_t regFrfValue = calculatedFrequency;           //Force cast the calculated value into an unsigned 32-bit integer to make byte separation easier
 
     uint8_t registerValues[0x00000003];  //Create an array of 3 bytes to use for separating the splitting the contents of register value across
 
-    registerValues[0x02] = registerValue & 0x000000FF;  //Write the first 8 bits of registerValue into the 3rd element of the registerValues array
-    registerValue >>= 0x00000008;                       //Shift the contents of the registerValue variable to the right by 8 bits
-    registerValues[0x01] = registerValue & 0x000000FF;  //Write the next 8 bits of registerValue into the 2nd element of the registerValues array
-    registerValue >>= 0x00000008;                       //Shift the contents of the registerValue variable to the right by 8 bits
-    registerValues[0x00] = registerValue & 0x000000FF;  //Write the final 8 bits of the registerValue variable into the first index of the array
-    
-    registerValues[0x00] = 0x6C;
-    registerValues[0x01] = 0x41;
-    registerValues[0x02] = 0x9B;
+    registerValues[0x02] = regFrfValue & 0x000000FF;  //Write the first 8 bits of regFrfValue into the 3rd element of the registerValues array
+    regFrfValue >>= 0x00000008;                       //Shift the contents of the registerValue variable to the right by 8 bits
+    registerValues[0x01] = regFrfValue & 0x000000FF;  //Write the next 8 bits of regFrfValue into the 2nd element of the registerValues array
+    regFrfValue >>= 0x00000008;                       //Shift the contents of the registerValue variable to the right by 8 bits
+    registerValues[0x00] = regFrfValue & 0x000000FF;  //Write the final 8 bits of the regFrfValue variable into the first index of the array
 
-    interactWithRegisters(0x07, registerValues, 0x00000003, 0x00);  //Write the configuration bits to the transceiver IC
+    interactWithRegisters(REGADDR_FRF_MSB, registerValues, 0x03, 0x00);  //Write the configuration bits to the transceiver IC
 }
 
 
+//Set Mode Function, puts the transceiver into the desired operating mode
+void setMode(SX1231Mode newMode)
+{
+    uint8_t registerValue = newMode << 0x00000002;  //Write the value of the newMode enum to the registerValue variable and shift it to the left by 2 bits
 
+    interactWithRegisters(0x01, &registerValue, 0x01, 0x00);  //Write the configuration byte to the transceiver IC
+}
 
 
 
@@ -62,9 +81,8 @@ void setCarrierFreq(uint32_t freqRF)
 
 
 //Interact With Registers Functions, reads/writes to the registers in the transceiver at the given start address using/into dataBytes 
-void interactWithRegisters(uint8_t startAddress, uint8_t *dataBytes, uint32_t bufferLength, uint8_t readMode)
+void interactWithRegisters(uint8_t startAddress, uint8_t *dataBytes, uint8_t bufferLength, uint8_t readMode)
 {
-    uint8_t test = 0x00;
     while (SPI2CON & 0x00000800);  //Wait until the SPI2 peripheral is in idle mode before starting the data transaction
 
     startAddress |= 0x80;                //Force-set Bit-7 of the startAddress variable to indicate the assumed write operation

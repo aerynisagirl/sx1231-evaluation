@@ -42,23 +42,38 @@ void main()
 {
     setupMCU();  //Configure the main functionality of the microcontroller for the application
 
+    uint32_t timer = 0x000FFFFF;
+    while (timer--);
+
+    initializeTransceiver();
+
+    uint8_t channel = 0x00;
+
     //Infinite loop of death :3
     while (0xFFFFFFFF)
     {
-        //Do things forever <3
-        //    (like living in a capitalistic hellscape loooool)
+//        uint32_t newFrequency = 433000000 + (channel++ * 25000);
+//        if (channel == 0x10) channel = 0x00;
 
-        uint32_t timer = 0x001FFFFF;
+//        setCarrierFreq(newFrequency);
+
+        uint8_t testBytes[] = "hello !!";
+        interactWithRegisters(REGADDR_FIFO, testBytes, 0x08, 0x00);
+        setMode(TX);
+        LATASET = 0x00000010;  //Put RA4 to logic HIGH
+        
+        uint8_t irqValue = 0x00;
+        do
+        {
+            interactWithRegisters(REGADDR_IRQFLAGS2, &irqValue, 0x01, 0xFF);
+        }
+        while ((irqValue & 0x08) == 0x00);
+        
+        setMode(STBY);
+        LATACLR = 0x00000010;  //Put RA4 to logic LOW
+
+        timer = 0x01FFFFFF;
         while (timer--);
-
-        setCarrierFreq(433025000);  //Set the carrier frequency of the RF transceiver to 433.025 MHz
-
-        timer = 0x000000FF;
-        while (timer--);
-        uint8_t inputBuffer[0x00000003];
-        interactWithRegisters(0x07, inputBuffer, 0x00000003, 0xFF);
-
-        LATAINV = 0x00000010;  //Toggle the state of RA4
     }
 }
 
