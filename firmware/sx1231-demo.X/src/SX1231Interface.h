@@ -36,10 +36,12 @@ extern void initializeTransceiver(sx1231modscheme_t modScheme,  //Initialize Tra
                                   uint32_t fskDev,
                                   uint32_t bitRate);
 
-extern void setCarrierFreq(uint32_t freqRF);               //Set Carrier Frequency Function, sets the RF transceiver to tune to the desired carrier frequency
-extern void setDeviceMode(sx1231opmode_t newMode);         //Set Device Mode Function, instructs the RF transceiver to enter the desired mode
-extern void setModScheme(sx1231modscheme_t newModScheme);  //Set Mod Scheme Function, sets the modulation scheme the transceiver is to operate in
-extern void setBitRate(uint16_t bitRate);                  //Set Bit Rate Function, sets the bit-rate at which data is to be sent and received at
+extern void loadPacket(uint8_t *payloadBytes,   //Load Packet Function, writes the desired packet to the FIFO buffer on the transceiver IC
+                       uint8_t payloadLength);
+
+extern void setDeviceMode(sx1231opmode_t newMode);  //Set Device Mode Function, instructs the RF transceiver to enter the desired mode
+extern void setCarrierFreq(uint32_t freqRF);        //Set Carrier Frequency Function, sets the RF transceiver to tune to the desired carrier frequency
+extern void setPowerLevel(uint8_t txPower);         //Set Power Level Function, sets the TX output power strength
 
 extern sx1231opmode_t getDeviceMode();  //Get Device Mode Function, returns the current mode that the transceiver is operating in
 

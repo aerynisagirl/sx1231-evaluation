@@ -32,8 +32,6 @@ void setupMCU()
     ODCB = 0x00001000;    //Enable the open-drain function on RB12
     ANSELB = 0x0000C00F;  //Set both RB13 and RB12 as digital inputs
     TRISB = 0x0000EFFF;   //Set RB12 to an output
-    
-    //    TODO: Setup DMA?
 }
 
 
@@ -45,32 +43,41 @@ void main()
     uint32_t timer = 0x000FFFFF;
     while (timer--);
 
-//    initializeTransceiver();
 
-    uint8_t channel = 0x00;
+
+    initializeTransceiver(FSK_F_BT10, 433000000, 750, 4800);
+
+
+
 
     //Infinite loop of death :3
     while (0xFFFFFFFF)
     {
-//        uint32_t newFrequency = 433000000 + (channel++ * 25000);
-//        if (channel == 0x10) channel = 0x00;
+        uint8_t powerSetting = 0x01;
 
-//        setCarrierFreq(newFrequency);
-
-        uint8_t testBytes[] = {0x08, 'h', 'e', 'l', 'l', 'o', ' ', '!', '!'};
-//        interactWithRegisters(REGADDR_FIFO, testBytes, 0x09, 0x00);
-//        setMode(TX);
-        LATASET = 0x00000010;  //Put RA4 to logic HIGH
-        
-        uint8_t irqValue = 0x00;
-        do
+        while (powerSetting < 0x17)
         {
-            interactWithRegisters(REGADDR_IRQFLAGS2, &irqValue, 0x01, 0xFF);
+            LATASET = 0x00000010;  //Put RA4 to logic HIGH
+
+            loadPacket("This is a test of the SX1231H", 29);
+            setPowerLevel(powerSetting++);
+            setDeviceMode(TX);
+
+            uint8_t irqValue = 0x00;
+            do
+            {
+                interactWithRegisters(REGADDR_IRQFLAGS2, &irqValue, 0x01, 0xFF);
+            }
+            while ((irqValue & 0x08) == 0x00);
+
+            setPowerLevel(0x00);
+            setDeviceMode(STBY);
+
+            LATACLR = 0x00000010;  //Put RA4 to logic LOW
+
+            timer = 0x0007FFFF;
+            while (timer--);
         }
-        while ((irqValue & 0x08) == 0x00);
-        
-//        setMode(STBY);
-        LATACLR = 0x00000010;  //Put RA4 to logic LOW
 
         timer = 0x01FFFFFF;
         while (timer--);

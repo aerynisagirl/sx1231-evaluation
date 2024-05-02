@@ -27,7 +27,7 @@ void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, ui
     regBitrateValue >>= 0x00000008;                          //Shift the contents of regBitrateValue to the right by 8 bits
     configBytes[0x00000002] = regBitrateValue & 0x000000FF;  //Write the remaining 8 bits of the calculated bitrate value into RegBitrateMsb
 
-    double calculatedDeviation = fskDev * SX1231_F_STEP;  //Calculate the value of Fdev to provide to the transceiver to achieve the desired frequency deviation in FSK mode
+    double calculatedDeviation = fskDev / SX1231_F_STEP;  //Calculate the value of Fdev to provide to the transceiver to achieve the desired frequency deviation in FSK mode
     uint16_t regFdevValue = calculatedDeviation;          //Force cast the calculated value into an unsigned 16-bit integer to make byte separation easier
     configBytes[0x00000005] = regFdevValue & 0x000000FF;  //Write the first 8 bits of the calculated deviation value into RegFdevLsb
     regFdevValue >>= 0x00000008;                          //Shift the contents of regFdevValue to the right by 8 bits
@@ -69,8 +69,7 @@ void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, ui
     configBytes[0x0000000A] = ((APPRF_PE_CODING & 0x00000003) << 0x00000005) | (APPRF_PE_ADDRESS_MODE & 0x0000000F);  //Set what DC free coding scheme to use in RegPacketConfig1
 
     if (!APPRF_PE_PACKET_SIZE) configBytes[0x0000000A] |= 0x80;  //Change the packet mode from fixed to variable length when a packet length is configured
-
-    configBytes[0x0000000B] = APPRF_PE_PACKET_SIZE;     //Write the desired packet size to the RegPayloadLength register
+    
     configBytes[0x0000000C] = APPRF_ADDRESS_NODE;       //Provide the configured node address
     configBytes[0x0000000D] = APPRF_ADDRESS_BROADCAST;  //Provide the configured broadcast address
 
@@ -104,7 +103,6 @@ void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, ui
 
 
 
-
 //    uint8_t configBytes[0x00000010] = {0x04, 0x08, 0x19, 0x00, 0x00, 0x52, 0x6C, 0x40, 0x00};
 //    interactWithRegisters(REGADDR_OPMODE, configBytes, 0x09, 0x00);
 
@@ -125,6 +123,32 @@ void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, ui
 //    configBytes[0x04] = 0x00;
 //    configBytes[0x05] = 0x8F;
 //    interactWithRegisters(REGADDR_PACKETCONFIG1, configBytes, 0x06, 0x00);
+}
+
+
+
+/**************************
+ *  Transceiver Commands  *
+ **************************/
+
+
+//Load Packet Function, writes the desired packet to the FIFO buffer on the transceiver IC
+void loadPacket(uint8_t *payloadBytes, uint8_t payloadLength)
+{
+    uint8_t formedFrame[0x00000101];    //Create a temporary buffer with the max number of bytes a frame can have
+    uint8_t *framePtr = formedFrame;    //Make a pointer to use for iterating through the addresses in the array above
+    uint8_t frameSize = payloadLength;  //Declare a variable to use for calculating the total size of the frame
+
+    if (!APPRF_PE_PACKET_SIZE) *framePtr = ++frameSize;  //Start the frame with the number of bytes the frame will contain in variable frame mode
+    
+
+    //Add every byte of the payload to the frame buffer
+    while (payloadLength--)
+    {
+        *(++framePtr) = *(payloadBytes++);  //Copy the next byte from the payloadBytes array into the frame buffer
+    }
+
+    interactWithRegisters(REGADDR_FIFO, formedFrame, frameSize, 0x00);  //Write the packet frame to the FIFO buffer of the transceiver
 }
 
 
@@ -161,6 +185,38 @@ void setDeviceMode(sx1231opmode_t newMode)
     interactWithRegisters(REGADDR_OPMODE, &registerValue, 0x01, 0x00);  //Write the configuration byte to the transceiver IC
 }
 
+
+//Set Power Level Function, sets the TX output power strength
+void setPowerLevel(uint8_t txPower)
+{
+    uint8_t paLevel = 0x00;               //Create a buffer variable to use for storing the value that will be written to RegPaLevel
+    uint8_t overcurrentRegister = 0x19;   //Create another buffer for storing the value to be written to the overcurrent settings register
+    uint8_t pa1HighPowerRegister = 0x55;  //Make a buffer for the high power settings register of PA1, defaulting to disabling high power mode
+    uint8_t pa2HighPowerRegister = 0x70;  //Make a buffer for the high power settings register of PA2, defaulting to disabling high power mode
+
+    if (txPower > 0x17) txPower = 0x17;  //Force any value of txPower greater than 0x17 back to 0x17 to prevent the offsets from messing up
+
+    if (txPower >= 0x08)
+    {
+        paLevel = 0x68 + txPower;  //Enable both PA1 and PA2 when operating in high power mode, setting the output level as requested
+
+        pa1HighPowerRegister = 0x5D;  //Put PA1 into high power mode
+        pa2HighPowerRegister = 0x7C;  //Put PA2 into high power mode
+    }
+    else if (txPower >= 0x05)
+    {
+        paLevel = 0x6B + txPower;  //Enable both PA1 and PA2, setting the output accordingly
+    }
+    else if (txPower)
+    {
+        paLevel = 0x4F + txPower;  //Enable PA1, and set the output level accordingly
+    }
+
+    interactWithRegisters(REGADDR_PALEVEL, &paLevel, 0x01, 0x00);               //Write the value of paLevel to the RegPaLevel register on the transceiver IC
+    interactWithRegisters(REGADDR_OCP, &overcurrentRegister, 0x01, 0x00);       //Write the value of overcurrentRegister to the RegOcp register on the transceiver IC
+    interactWithRegisters(REGADDR_TESTPA1, &pa1HighPowerRegister, 0x01, 0x00);  //Write the value of pa1HighPowerRegister to the RegTestPa1 register on the transceiver IC
+    interactWithRegisters(REGADDR_TESTPA2, &pa2HighPowerRegister, 0x01, 0x00);  //Write the value of pa2HighPowerRegister to the RegTestPa2 register on the transceiver IC
+}
 
 
 //Get Device Mode Function, returns the current mode that the transceiver is operating in

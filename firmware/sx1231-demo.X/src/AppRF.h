@@ -26,7 +26,7 @@
 
 //Sync Word
 #ifndef APPRF_PE_SYNC_SIZE
-#define APPRF_PE_SYNC_SIZE                  0x04    //Sync Word Length (0 disables the sync word entirely)
+#define APPRF_PE_SYNC_SIZE                  0x00    //Sync Word Length (0 disables the sync word entirely)
 
 #define APPRF_PE_SYNC_B0                    0x73    //Sync Word Byte 1
 #define APPRF_PE_SYNC_B1                    0x79
