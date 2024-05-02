@@ -22,17 +22,20 @@ void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, ui
     configBytes[0x00000000] = 0x04;       //Put the transceiver into STANDBY mode by default
     configBytes[0x00000001] = modScheme;  //Set the desired modulation scheme
 
+    //Set the modulation bit-rate
     uint32_t regBitrateValue = SX1231_F_XOSC / bitRate;      //Calculate the value to be written to the bitrate registers in order to achieve the desired bit-rate
     configBytes[0x00000003] = regBitrateValue & 0x000000FF;  //Write the first 8 bits of the calculated bitrate value into RegBitrateLsb
     regBitrateValue >>= 0x00000008;                          //Shift the contents of regBitrateValue to the right by 8 bits
     configBytes[0x00000002] = regBitrateValue & 0x000000FF;  //Write the remaining 8 bits of the calculated bitrate value into RegBitrateMsb
 
+    //Set the frequency deviation to use for FSK mode
     double calculatedDeviation = fskDev / SX1231_F_STEP;  //Calculate the value of Fdev to provide to the transceiver to achieve the desired frequency deviation in FSK mode
     uint16_t regFdevValue = calculatedDeviation;          //Force cast the calculated value into an unsigned 16-bit integer to make byte separation easier
     configBytes[0x00000005] = regFdevValue & 0x000000FF;  //Write the first 8 bits of the calculated deviation value into RegFdevLsb
     regFdevValue >>= 0x00000008;                          //Shift the contents of regFdevValue to the right by 8 bits
     configBytes[0x00000004] = regFdevValue & 0x0000003F;  //Write the last 6 bits of the calculated deviation value into RegFdevMsb
 
+    //Set the carrier frequency
     double calculatedFrequency = carrierFreq / SX1231_F_STEP;  //Calculate the value of Frf to provide the transceiver IC to achieve the desired carrier frequency
     uint32_t regFrfValue = calculatedFrequency;                //Force cast the calculated value into an unsigned 32-bit integer to make byte separation easier
     configBytes[0x00000008] = regFrfValue & 0x000000FF;        //Write the first 8 bits of regFrfValue into RegFrfLsb
@@ -75,7 +78,6 @@ void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, ui
 
     interactWithRegisters(0x2C, configBytes, 0x0E, 0x00);  //Send the configuration bytes to the transceiver IC with a starting address of 0x2C (RegPreambleMsb)
 
-
 #ifdef APPRF_AES_ENABLED
     configBytes[0x00000000] = 0x01;
 
@@ -100,29 +102,6 @@ void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, ui
     interactWithRegisters(0x3D, configBytes, 0x11, 0x00);  //Write the AES key to the transceiver IC's internal memory whilst enabling AES mode on the packet engine
 #endif
 
-
-
-
-//    uint8_t configBytes[0x00000010] = {0x04, 0x08, 0x19, 0x00, 0x00, 0x52, 0x6C, 0x40, 0x00};
-//    interactWithRegisters(REGADDR_OPMODE, configBytes, 0x09, 0x00);
-
-//    configBytes[0x00] = 0x7F;
-//    configBytes[0x01] = 0x09;
-//    configBytes[0x02] = 0x0F;
-//    interactWithRegisters(REGADDR_PALEVEL, configBytes, 0x03, 0x00);
-//
-//    configBytes[0x00] = 0x00;
-//    configBytes[0x01] = 0x0F;
-//    configBytes[0x02] = 0x18;
-//    interactWithRegisters(REGADDR_PREAMBLE_MSB, configBytes, 0x03, 0x00);
-//
-//    configBytes[0x00] = 0x80;
-//    configBytes[0x01] = 0x40;
-//    configBytes[0x02] = 0x00;
-//    configBytes[0x03] = 0x00;
-//    configBytes[0x04] = 0x00;
-//    configBytes[0x05] = 0x8F;
-//    interactWithRegisters(REGADDR_PACKETCONFIG1, configBytes, 0x06, 0x00);
 }
 
 
