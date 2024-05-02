@@ -2,5 +2,7 @@
 .generated_files/*
 queuelogs/*
 build/*
+debug/*
+dist/*
 defmplabxtrace.log
 defmplabxtrace.log.inx

@@ -7,6 +7,7 @@
       <itemPath>src/Main.h</itemPath>
       <itemPath>src/SX1231Interface.h</itemPath>
       <itemPath>src/SX1231Registers.h</itemPath>
+      <itemPath>src/AppRF.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -365,6 +366,8 @@
         <property key="memories.programmemory" value="true"/>
         <property key="memories.programmemory.ranges" value="1d000000-1d01ffff"/>
         <property key="poweroptions.powerenable" value="true"/>
+        <property key="programmerToGoFilePath"
+                  value="A:/sx1231-evaluation/firmware/sx1231-demo.X/debug/default/sx1231-demo_ptg"/>
         <property key="programmerToGoImageName" value="sx1231-demo_ptg"/>
         <property key="programoptions.donoteraseauxmem" value="false"/>
         <property key="programoptions.eraseb4program" value="true"/>

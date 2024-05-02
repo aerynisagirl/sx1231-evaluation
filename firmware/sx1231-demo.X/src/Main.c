@@ -45,7 +45,7 @@ void main()
     uint32_t timer = 0x000FFFFF;
     while (timer--);
 
-    initializeTransceiver();
+//    initializeTransceiver();
 
     uint8_t channel = 0x00;
 
@@ -57,9 +57,9 @@ void main()
 
 //        setCarrierFreq(newFrequency);
 
-        uint8_t testBytes[] = "hello !!";
-        interactWithRegisters(REGADDR_FIFO, testBytes, 0x08, 0x00);
-        setMode(TX);
+        uint8_t testBytes[] = {0x08, 'h', 'e', 'l', 'l', 'o', ' ', '!', '!'};
+//        interactWithRegisters(REGADDR_FIFO, testBytes, 0x09, 0x00);
+//        setMode(TX);
         LATASET = 0x00000010;  //Put RA4 to logic HIGH
         
         uint8_t irqValue = 0x00;
@@ -69,7 +69,7 @@ void main()
         }
         while ((irqValue & 0x08) == 0x00);
         
-        setMode(STBY);
+//        setMode(STBY);
         LATACLR = 0x00000010;  //Put RA4 to logic LOW
 
         timer = 0x01FFFFFF;

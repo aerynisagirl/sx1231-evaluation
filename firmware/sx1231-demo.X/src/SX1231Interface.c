@@ -14,30 +14,117 @@
 
 
 //Initialize Transceiver Function, configures the transceiver IC to operate as required for the application
-void initializeTransceiver()
+void initializeTransceiver(sx1231modscheme_t modScheme, uint32_t carrierFreq, uint32_t fskDev, uint32_t bitRate)
 {
-    uint8_t configBytes[0x00000010] = {0x04, 0x09, 0x19, 0x00, 0x00, 0x52, 0x6C, 0x40, 0x00};
-    interactWithRegisters(REGADDR_OPMODE, configBytes, 0x09, 0x00);
+    uint8_t configBytes[0x00000010];  //Create an array of bytes to use for writing the desired configuration settings to the transceiver IC
+    
+    //Common configuration registers
+    configBytes[0x00000000] = 0x04;       //Put the transceiver into STANDBY mode by default
+    configBytes[0x00000001] = modScheme;  //Set the desired modulation scheme
 
-    configBytes[0x00] = 0x5F;
-    configBytes[0x01] = 0x09;
-    configBytes[0x02] = 0x0F;
-    interactWithRegisters(REGADDR_PALEVEL, configBytes, 0x03, 0x00);
+    uint32_t regBitrateValue = SX1231_F_XOSC / bitRate;      //Calculate the value to be written to the bitrate registers in order to achieve the desired bit-rate
+    configBytes[0x00000003] = regBitrateValue & 0x000000FF;  //Write the first 8 bits of the calculated bitrate value into RegBitrateLsb
+    regBitrateValue >>= 0x00000008;                          //Shift the contents of regBitrateValue to the right by 8 bits
+    configBytes[0x00000002] = regBitrateValue & 0x000000FF;  //Write the remaining 8 bits of the calculated bitrate value into RegBitrateMsb
 
-    configBytes[0x00] = 0x00;
-    configBytes[0x01] = 0x0F;
-    configBytes[0x02] = 0x18;
-    interactWithRegisters(REGADDR_PREAMBLE_MSB, configBytes, 0x03, 0x00);
+    double calculatedDeviation = fskDev * SX1231_F_STEP;  //Calculate the value of Fdev to provide to the transceiver to achieve the desired frequency deviation in FSK mode
+    uint16_t regFdevValue = calculatedDeviation;          //Force cast the calculated value into an unsigned 16-bit integer to make byte separation easier
+    configBytes[0x00000005] = regFdevValue & 0x000000FF;  //Write the first 8 bits of the calculated deviation value into RegFdevLsb
+    regFdevValue >>= 0x00000008;                          //Shift the contents of regFdevValue to the right by 8 bits
+    configBytes[0x00000004] = regFdevValue & 0x0000003F;  //Write the last 6 bits of the calculated deviation value into RegFdevMsb
 
-    configBytes[0x00] = 0x80;
-    configBytes[0x01] = 0x40;
-    configBytes[0x02] = 0x00;
-    configBytes[0x03] = 0x00;
-    configBytes[0x04] = 0x00;
-    configBytes[0x05] = 0x8F;
-    interactWithRegisters(REGADDR_PACKETCONFIG1, configBytes, 0x06, 0x00);
+    double calculatedFrequency = carrierFreq / SX1231_F_STEP;  //Calculate the value of Frf to provide the transceiver IC to achieve the desired carrier frequency
+    uint32_t regFrfValue = calculatedFrequency;                //Force cast the calculated value into an unsigned 32-bit integer to make byte separation easier
+    configBytes[0x00000008] = regFrfValue & 0x000000FF;        //Write the first 8 bits of regFrfValue into RegFrfLsb
+    regFrfValue >>= 0x00000008;                                //Shift the contents of regFrfValue to the right by 8 bits
+    configBytes[0x00000007] = regFrfValue & 0x000000FF;        //Wrist the next 8 bits of regFrfValue into RegFrfMid
+    regFrfValue >>= 0x00000008;                                //Shift the contents of regFrfValue to the right by 8 bits again
+    configBytes[0x00000006] = regFrfValue & 0x000000FF;        //Write the final 8 bitsof regFrfValue into RegFrfMsb
 
-    setCarrierFreq(431500000);
+    interactWithRegisters(0x01, configBytes, 0x09, 0x00);  //Send the configuration bytes to the transceiver IC with a starting address of 0x01 (RegOpMode)
+
+
+
+    //Packet engine registers
+    configBytes[0x00000001] = APPRF_PE_PREAMBLE_SIZE & 0x000000FF;                  //Write the first 8 bits of the preamble size into RegPreambleLsb
+    configBytes[0x00000000] = (APPRF_PE_PREAMBLE_SIZE & 0x0000FF00) >> 0x00000008;  //Write the last 8 bits of the preamble size into RegPreambleMsb
+
+    configBytes[0x00000002] = APPRF_PE_SYNC_TOLERANCE & 0x07;  //Write the desired sync word tolerance to RegSyncConfig
+
+    //Enable the sync word settings in RegSyncConfig when the size of the sync word is specified as greater than 0
+    if (APPRF_PE_SYNC_SIZE)
+    {
+        configBytes[0x00000002] |= 0x80 | ((APPRF_PE_SYNC_SIZE - 0x01) << 0x00000003);  //Set the size of the sync word and enable it
+    }
+
+    //Load the sync word bytes into their associated registers
+    configBytes[0x00000003] = APPRF_PE_SYNC_B0;
+    configBytes[0x00000004] = APPRF_PE_SYNC_B1;
+    configBytes[0x00000005] = APPRF_PE_SYNC_B3;
+    configBytes[0x00000006] = APPRF_PE_SYNC_B4;
+    configBytes[0x00000007] = APPRF_PE_SYNC_B5;
+    configBytes[0x00000008] = APPRF_PE_SYNC_B6;
+    configBytes[0x00000009] = APPRF_PE_SYNC_B7;
+
+    configBytes[0x0000000A] = ((APPRF_PE_CODING & 0x00000003) << 0x00000005) | (APPRF_PE_ADDRESS_MODE & 0x0000000F);  //Set what DC free coding scheme to use in RegPacketConfig1
+
+    if (!APPRF_PE_PACKET_SIZE) configBytes[0x0000000A] |= 0x80;  //Change the packet mode from fixed to variable length when a packet length is configured
+
+    configBytes[0x0000000B] = APPRF_PE_PACKET_SIZE;     //Write the desired packet size to the RegPayloadLength register
+    configBytes[0x0000000C] = APPRF_ADDRESS_NODE;       //Provide the configured node address
+    configBytes[0x0000000D] = APPRF_ADDRESS_BROADCAST;  //Provide the configured broadcast address
+
+    interactWithRegisters(0x2C, configBytes, 0x0E, 0x00);  //Send the configuration bytes to the transceiver IC with a starting address of 0x2C (RegPreambleMsb)
+
+
+#ifdef APPRF_AES_ENABLED
+    configBytes[0x00000000] = 0x01;
+
+    //Load the AES key into the transceiver
+    configBytes[0x00000001] = APPRF_AES_KEY00;
+    configBytes[0x00000002] = APPRF_AES_KEY01;
+    configBytes[0x00000003] = APPRF_AES_KEY02;
+    configBytes[0x00000004] = APPRF_AES_KEY03;
+    configBytes[0x00000005] = APPRF_AES_KEY04;
+    configBytes[0x00000006] = APPRF_AES_KEY05;
+    configBytes[0x00000007] = APPRF_AES_KEY06;
+    configBytes[0x00000008] = APPRF_AES_KEY07;
+    configBytes[0x00000009] = APPRF_AES_KEY08;
+    configBytes[0x0000000A] = APPRF_AES_KEY09;
+    configBytes[0x0000000B] = APPRF_AES_KEY10;
+    configBytes[0x0000000C] = APPRF_AES_KEY11;
+    configBytes[0x0000000D] = APPRF_AES_KEY12;
+    configBytes[0x0000000E] = APPRF_AES_KEY13;
+    configBytes[0x0000000F] = APPRF_AES_KEY14;
+    configBytes[0x00000010] = APPRF_AES_KEY15;
+
+    interactWithRegisters(0x3D, configBytes, 0x11, 0x00);  //Write the AES key to the transceiver IC's internal memory whilst enabling AES mode on the packet engine
+#endif
+
+
+
+
+
+//    uint8_t configBytes[0x00000010] = {0x04, 0x08, 0x19, 0x00, 0x00, 0x52, 0x6C, 0x40, 0x00};
+//    interactWithRegisters(REGADDR_OPMODE, configBytes, 0x09, 0x00);
+
+//    configBytes[0x00] = 0x7F;
+//    configBytes[0x01] = 0x09;
+//    configBytes[0x02] = 0x0F;
+//    interactWithRegisters(REGADDR_PALEVEL, configBytes, 0x03, 0x00);
+//
+//    configBytes[0x00] = 0x00;
+//    configBytes[0x01] = 0x0F;
+//    configBytes[0x02] = 0x18;
+//    interactWithRegisters(REGADDR_PREAMBLE_MSB, configBytes, 0x03, 0x00);
+//
+//    configBytes[0x00] = 0x80;
+//    configBytes[0x01] = 0x40;
+//    configBytes[0x02] = 0x00;
+//    configBytes[0x03] = 0x00;
+//    configBytes[0x04] = 0x00;
+//    configBytes[0x05] = 0x8F;
+//    interactWithRegisters(REGADDR_PACKETCONFIG1, configBytes, 0x06, 0x00);
 }
 
 
@@ -65,19 +152,34 @@ void setCarrierFreq(uint32_t freqRF)
 }
 
 
-//Set Mode Function, puts the transceiver into the desired operating mode
-void setMode(SX1231Mode newMode)
+//Set Device Mode Function, puts the transceiver into the desired operating mode
+void setDeviceMode(sx1231opmode_t newMode)
 {
-    uint8_t registerValue = newMode << 0x00000002;  //Write the value of the newMode enum to the registerValue variable and shift it to the left by 2 bits
+    if (newMode == MODE_RESERVED) return;  //Just leave if trying to set the mode of the transceiver to something invalid
 
-    interactWithRegisters(0x01, &registerValue, 0x01, 0x00);  //Write the configuration byte to the transceiver IC
+    uint8_t registerValue = newMode << 0x00000002;                      //Write the value of the newMode enum to the registerValue variable and shift it to the left by 2 bits
+    interactWithRegisters(REGADDR_OPMODE, &registerValue, 0x01, 0x00);  //Write the configuration byte to the transceiver IC
 }
 
 
 
-/***************************************
- *  Transceiver Interaction Functions  *
- ***************************************/
+//Get Device Mode Function, returns the current mode that the transceiver is operating in
+sx1231opmode_t getDeviceMode()
+{
+    uint8_t registerValue = 0x00;                                       //Create a buffer variable to use for storing the read byte
+    interactWithRegisters(REGADDR_OPMODE, &registerValue, 0x01, 0xFF);  //Read the contents of the RegOpMode register from the transceiver
+
+    registerValue = (registerValue & 0x1C) >> 0x00000002;  //Mask out the bits that set the transceivers mode and shift them over to the right by 2 bits
+    if (registerValue >= 0x05) registerValue = 0x05;       //Force the mode number to 0x05 if it's set to any number thats classified as Reserved as per the datasheet
+
+    return (sx1231opmode_t) registerValue;  //Cast the integer to the sx1231mode_t type and return the enum
+}
+
+
+
+/*****************************************
+ *  Transceiver Data Exchange Functions  *
+ *****************************************/
 
 
 //Interact With Registers Functions, reads/writes to the registers in the transceiver at the given start address using/into dataBytes 
